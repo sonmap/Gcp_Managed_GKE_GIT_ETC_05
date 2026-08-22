@@ -94,6 +94,11 @@ variable "accelerator_count" {
   description = "Accelerator count when accelerator_type is set"
   type        = number
   default     = 0
+
+  validation {
+    condition     = var.accelerator_count >= 0
+    error_message = "accelerator_count must be zero or greater."
+  }
 }
 
 variable "disk_type" {
@@ -106,12 +111,25 @@ variable "disk_size_gb" {
   description = "Persistent data disk size per runtime"
   type        = number
   default     = 100
+
+  validation {
+    condition     = var.disk_size_gb >= 10 && var.disk_size_gb <= 65536
+    error_message = "disk_size_gb must be between 10 and 65536 GB."
+  }
 }
 
 variable "idle_shutdown_minutes" {
-  description = "Idle timeout before Colab stops runtime compute"
+  description = "Idle timeout before Colab stops runtime compute. 0 disables idle shutdown."
   type        = number
   default     = 60
+
+  validation {
+    condition = (
+      var.idle_shutdown_minutes == 0 ||
+      (var.idle_shutdown_minutes >= 10 && var.idle_shutdown_minutes <= 1440)
+    )
+    error_message = "idle_shutdown_minutes must be 0, or between 10 and 1440 minutes."
+  }
 }
 
 variable "enable_internet_access" {
@@ -144,9 +162,18 @@ variable "colab_release_name" {
 }
 
 variable "startup_script_url" {
-  description = "Optional gs:// startup script used to install corporate packages/configuration"
+  description = "Optional gs:// or https:// post-startup script used to install corporate packages/configuration"
   type        = string
   default     = ""
+
+  validation {
+    condition = (
+      var.startup_script_url == "" ||
+      startswith(var.startup_script_url, "gs://") ||
+      startswith(var.startup_script_url, "https://")
+    )
+    error_message = "startup_script_url must be empty, gs://..., or https://...."
+  }
 }
 
 variable "storage_location" {
