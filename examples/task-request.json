@@ -1,0 +1,28 @@
+{
+  "taskId": "model-001",
+  "taskName": "fraud-detection-model",
+  "requestUser": "user01@example.com",
+  "teamUsers": [
+    "user02@example.com",
+    "user03@example.com",
+    "user04@example.com",
+    "user05@example.com"
+  ],
+  "group": "fraud",
+  "targetProjectId": "dev-com-334508",
+  "location": "asia-northeast3",
+  "machineType": "e2-standard-4",
+  "diskType": "pd-balanced",
+  "diskSizeGb": 100,
+  "idleShutdownMinutes": 60,
+  "enableInternetAccess": false,
+  "enableEndUserCredentials": true,
+  "runtimeDesiredState": "STOPPED",
+  "bigqueryRole": "editor",
+  "acceleratorType": "",
+  "acceleratorCount": 0,
+  "startupScriptUrl": "",
+  "kmsKeyName": "",
+  "allowDestroyData": false,
+  "expireDate": "2026-12-31"
+}
