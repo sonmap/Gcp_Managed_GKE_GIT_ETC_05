@@ -1,6 +1,6 @@
 # GCP Managed Data Model Workspace - Colab Enterprise
 
-`Gcp_Managed_GKE_GIT_ETC_04`의 포털 승인 -> Cloud Run Adapter -> Infrastructure Manager -> Terraform 흐름은 유지하면서, 과제 실행 영역을 **GKE Autopilot + Jupyter Pod**에서 **Colab Enterprise Runtime**으로 전환한 PoC/Reference 구현입니다.
+`Gcp_Managed_GKE_GIT_ETC_04`의 **포털 승인 -> Cloud Run Adapter -> Infrastructure Manager -> Terraform** 흐름은 유지하면서, 과제 실행 영역을 **GKE Autopilot + Jupyter Pod**에서 **Colab Enterprise Runtime**으로 전환한 PoC/Reference 구현입니다.
 
 ## 핵심 전환
 
@@ -59,12 +59,12 @@ Infrastructure Manager
        v                              v
 Foundation Deployment            Task Deployment (과제마다)
 - APIs                           - BigQuery Dataset
-- Colab project                 - GCS Workspace Bucket
-- Existing VPC/Subnet 확인       - Runtime Template
-                                 - Runtime / user
-                                 - Colab IAM
-                                 - BigQuery/GCS IAM
-                                 - task Service Account(optional batch)
+- Existing VPC/Subnet 확인       - GCS Workspace Bucket
+                                - Runtime Template
+                                - Runtime / user
+                                - Colab IAM
+                                - BigQuery/GCS IAM
+                                - task Service Account(optional batch)
 ```
 
 ## 프로젝트 모델
@@ -85,7 +85,8 @@ cloud-run-adapter/                       포털 JSON -> IM 입력값 변환
 portal-integration/                      Java 호출 예제
 docs/                                    설계/운영/테스트 문서
 examples/                                승인 요청 JSON 예제
-scripts/                                 검증용 gcloud/curl 스크립트
+notebooks/                               Colab smoke-test notebook
+scripts/                                 검증용 gcloud/curl/정적검증 스크립트
 ```
 
 ## 사용자 모델
@@ -125,29 +126,66 @@ scripts/                                 검증용 gcloud/curl 스크립트
 
 ## 적용 순서
 
+### 1. 최초 Bootstrap
+
 ```bash
-# 1. 최초 bootstrap (관리자)
 cd infra-manager/terraform/bootstrap
 terraform init
 terraform apply -var="project_id=dev-com-334508"
+```
 
-# 2. Cloud Run Adapter 배포
+### 2. Cloud Run Adapter 배포
+
+```bash
 cd ../../../cloud-run-adapter
-export IM_PROJECT_ID=dev-com-334508
+
+export PROJECT_ID=dev-com-334508
+export TARGET_PROJECT_ID=dev-com-334508
 export COLAB_PROJECT_ID=dev-com-334508
 export NETWORK_PROJECT_ID=dev-com-334508
-./deploy.sh
+export REGION=asia-northeast3
+export NETWORK_NAME=managed02-dev-vpc
+export SUBNETWORK_NAME=managed02-dev-subnet
 
-# 3. 승인 JSON 테스트
+./deploy.sh
+```
+
+Cloud Run은 기본적으로 인증 호출만 허용합니다. 단순 PoC에서만 `ALLOW_UNAUTHENTICATED=true`를 사용하십시오.
+
+### 3. 승인 JSON 테스트
+
+```bash
 cd ../scripts
+export PROJECT_ID=dev-com-334508
 ./test_flow.sh
 ```
+
+`test_flow.sh`는 `/health -> /preview -> /deploy -> Infrastructure Manager operation polling` 순서로 수행합니다.
+
+### 4. 정적 검증
+
+```bash
+./validate.sh
+```
+
+Python/Bash/JSON 문법을 검사하고, 로컬에 Terraform이 있으면 `terraform fmt`와 `terraform validate`까지 수행합니다.
+
+## Colab Notebook 확인
+
+`notebooks/00_colab_workspace_check.ipynb`를 Colab Enterprise에서 열어 다음을 확인할 수 있습니다.
+
+- `DATA_MODEL_TASK_ID`
+- `DATA_MODEL_DATASET`
+- `DATA_MODEL_WORKSPACE_BUCKET`
+- End-User Credentials 감지
+- 과제 BigQuery Dataset 접근
+- 과제 GCS workspace 쓰기
 
 ## 네트워크 기본값
 
 운영 기본은 `enableInternetAccess=false`입니다. 이 경우 Runtime이 Google APIs/내부 데이터레이크에 접근하려면 사용하는 subnet의 **Private Google Access**, DNS, route, 방화벽, 필요 시 Cloud NAT 또는 Private Service Connect 구성을 별도로 확인해야 합니다.
 
-Shared VPC 환경에서는 `NETWORK_PROJECT_ID`를 host project로 지정합니다.
+Shared VPC 환경에서는 `NETWORK_PROJECT_ID`를 host project로 지정하고 Agent Platform/Colab service agent의 `roles/compute.networkUser`도 확인합니다. 상세 명령은 `docs/operations.md`에 있습니다.
 
 ## 비용 제어
 
@@ -166,6 +204,19 @@ Shared VPC 환경에서는 `NETWORK_PROJECT_ID`를 host project로 지정합니�
 - BigQuery Dataset과 GCS bucket은 과제별 IAM
 - 필요 시 VPC Service Controls + CMEK 추가
 - Infrastructure Manager 실행 SA는 bootstrap에서만 권한 부여
+
+### 공통 Colab Project의 주의점
+
+표준 `roles/aiplatform.colabEnterpriseUser`에는 Dataform/Colab project-level 권한이 포함됩니다. 따라서 **BigQuery/GCS 데이터 권한은 과제별로 분리되지만 Notebook 코드 자산의 project-level 가시성은 별도로 검토해야 합니다.**
+
+운영 권장안은 다음입니다.
+
+1. 3~5개 분석 Group별 Colab project 분리
+2. project-level Colab 역할은 중앙 Google Group으로 관리
+3. 과제별 Runtime Template + BigQuery/GCS IAM 유지
+4. 강한 Notebook 코드 격리가 필요하면 Custom Role + Notebook resource IAM 적용
+
+자세한 내용은 `docs/architecture.md`를 참조하십시오.
 
 ## ETC_04와의 중요한 차이
 
