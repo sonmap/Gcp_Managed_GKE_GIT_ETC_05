@@ -12,8 +12,9 @@ bash -n cloud-run-adapter/deploy.sh
 bash -n scripts/test_flow.sh
 bash -n scripts/validate.sh
 
-echo "[3/4] JSON syntax"
+echo "[3/4] JSON / Notebook syntax"
 python3 -m json.tool examples/task-request.json >/dev/null
+python3 -m json.tool notebooks/00_colab_workspace_check.ipynb >/dev/null
 
 echo "[4/4] Terraform format / validate"
 if ! command -v terraform >/dev/null 2>&1; then
@@ -31,6 +32,6 @@ do
   echo "-- ${DIR}"
   terraform -chdir="${DIR}" init -backend=false -input=false >/dev/null
   terraform -chdir="${DIR}" validate
- done
+done
 
 echo "Validation complete."
